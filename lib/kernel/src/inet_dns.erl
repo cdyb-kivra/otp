@@ -31,6 +31,8 @@
 %% RFC 2181: Clarifications to the DNS Specification
 %% RFC 2782: A DNS RR for specifying the location of services (DNS SRV)
 %% RFC 2915: The Naming Authority Pointer (NAPTR) DNS Resource Rec
+%% RFC 4034: Resource Records for the DNS Security Extensions
+%% RFC 5155: DNS Security (DNSSEC) Hashed Authenticated Denial of Existence
 %% RFC 5936: DNS Zone Transfer Protocol (AXFR)
 %% RFC 6488: DNS Certification Authority Authorization (CAA) Resource Record
 %% RFC 6762: Multicast DNS
@@ -437,6 +439,13 @@ decode_type(Type) ->
 	?T_NAPTR -> ?S_NAPTR;
 	?T_OPT -> ?S_OPT;
 	?T_SPF -> ?S_SPF;
+    %% DNSSEC
+    ?T_DS -> ?S_DS;
+    ?T_DNSKEY -> ?S_DNSKEY;
+    ?T_RRSIG -> ?S_RRSIG;
+    ?T_NSEC -> ?S_NSEC;
+    ?T_NSEC3 -> ?S_NSEC3;
+    ?T_NSEC3PARAM -> ?S_NSEC3PARAM;
 	%% non standard
 	?T_UINFO -> ?S_UINFO;
 	?T_UID -> ?S_UID;
@@ -480,6 +489,13 @@ encode_type(Type) ->
 	?S_NAPTR -> ?T_NAPTR;
 	?S_OPT -> ?T_OPT;
 	?S_SPF -> ?T_SPF;
+    %% DNSSEC
+    ?S_DS -> ?T_DS;
+    ?S_DNSKEY -> ?T_DNSKEY;
+    ?S_RRSIG -> ?T_RRSIG;
+    ?S_NSEC -> ?T_NSEC;
+    ?S_NSEC3 -> ?T_NSEC3;
+    ?S_NSEC3PARAM -> ?T_NSEC3PARAM;
 	%% non standard
 	?S_UINFO -> ?T_UINFO;
 	?S_UID -> ?T_UID;
@@ -689,6 +705,67 @@ decode_data(Data, ?S_CAA, _) ->
                   {Flags,inet_db:tolower(Tag),Value}
               end)
        end);
+decode_data(Data, ?S_DNSKEY, _) ->
+    ?MATCH_ELSE_DECODE_ERROR(
+        Data,
+        <<_:7, ZoneKey:1, _:7, SEP:1, Protocol:8, Algorithm:8, KeyData/binary>>,
+        begin
+          #{zk => ZoneKey, sep => SEP, protocol => Protocol, algorithm
+            => Algorithm, public_key => KeyData, keytag => keytag(Data)}
+        end);
+decode_data(Data, ?S_RRSIG, Buffer) ->
+    ?MATCH_ELSE_DECODE_ERROR(
+        Data,
+        <<TypeCovered:16, Algorithm:8, Labels:8, OriginalTTL:32,
+          SignatureExp:32, SignatureInc:32, KeyTag:16, Data1/binary>>,
+        begin
+            {Signature, SignersName} = decode_name(Data1, Buffer),
+          #{
+            type_covered => decode_type(TypeCovered),
+            algorithm => Algorithm,
+            labels => Labels,
+            original_ttl => OriginalTTL,
+            signature_expire => SignatureExp,
+            signature_inception => SignatureInc,
+            keytag => KeyTag,
+            signers_name => SignersName,
+            signature => Signature
+          }
+        end);
+decode_data(Data, ?S_NSEC, Buffer) ->
+    {Bitmaps, NextName} = decode_name(Data, Buffer),
+    #{next_name => NextName, types => decode_type_bitmaps(Bitmaps)};
+decode_data(Data, ?S_DS, _) ->
+    ?MATCH_ELSE_DECODE_ERROR(
+        Data,
+        <<KeyTag:16, Algorithm:8, DigestType:8, Digest/binary>>,
+        begin
+          #{keytag => KeyTag, algorithm => Algorithm, digest_type =>
+                DigestType, digest => Digest} 
+        end);
+decode_data(Data, ?S_NSEC3PARAM, _) ->
+    ?MATCH_ELSE_DECODE_ERROR(
+        Data,
+        <<HashAlgorithm:8, Flags:8, Iterations:16, SaltLength:8, Salt:SaltLength/binary>>,
+        begin
+          #{hash_algorithm => HashAlgorithm, flags => Flags, iterations => Iterations, salt_length => SaltLength, salt => Salt}
+        end);
+decode_data(Data, ?S_NSEC3, _) ->
+    ?MATCH_ELSE_DECODE_ERROR(
+        Data,
+        <<HashAlgorithm:8, Flags:8, Iterations:16, SaltLength:8, Salt:SaltLength/binary, HashLength:8, Hash:HashLength/binary, TypeBitmaps/binary>>,
+        begin
+            #{
+                hash_algorithm => HashAlgorithm,
+                flags => Flags,
+                iterations => Iterations,
+                salt_length => SaltLength,
+                salt => Salt,
+                hash_length => HashLength,
+                hash => Hash,
+                types => decode_type_bitmaps(TypeBitmaps)
+            }
+        end);
 %%
 %% sofar unknown or non standard
 decode_data(Data, Type, _) when is_integer(Type) ->
@@ -1078,3 +1155,39 @@ encode_algname(Alg) ->
         ?S_TSIG_HMAC_SHA512_256 -> ?T_TSIG_HMAC_SHA512_256;
        Alg when is_list(Alg) -> Alg  % raw unknown algname
     end.
+
+%% Decode the RR type bitmaps from NSEC and NSEC3 records
+decode_type_bitmaps(Bitmaps) ->
+    decode_type_bitmaps([], Bitmaps).
+
+decode_type_bitmaps(Acc, <<>>) ->
+    lists:reverse(Acc);
+decode_type_bitmaps(Acc, <<Window:8, Length:8, Bits:Length/unit:8, Rest/binary>>) ->
+    SetBits = find_set_bits(Bits, Length*8),
+    RRTypes = lists:map(fun(N) -> decode_type(Window*256 + N) end, SetBits),
+    decode_type_bitmaps(RRTypes ++ Acc, Rest).
+
+find_set_bits(N, Start) ->
+    find_set_bits(N, Start, 0, []).
+
+find_set_bits(0, _Start, _Count, Acc) ->
+    lists:reverse(Acc);
+find_set_bits(N, Start, Count, Acc) ->
+    case N band 1 of
+        1 ->
+            find_set_bits(N bsr 1, Start, Count+1, [Start - Count - 1 | Acc]);
+        0 ->
+            find_set_bits(N bsr 1, Start, Count+1, Acc)
+    end.
+
+keytag(Data) ->
+    keytag(Data, 0, 0).
+
+% Algorithm from https://www.rfc-editor.org/rfc/rfc4034.html#appendix-B
+keytag(<<>>, Acc0, _EvenOdd) ->
+    Acc = Acc0 + ((Acc0 bsr 16) band 16#ffff),
+    Acc band 16#ffff;
+keytag(<<N:8, Rest/binary>>, Acc, 0) ->
+    keytag(Rest, Acc + (N bsl 8), 1);
+keytag(<<N:8, Rest/binary>>, Acc, 1) ->
+    keytag(Rest, Acc + N, 0).

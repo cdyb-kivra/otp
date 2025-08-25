@@ -22,6 +22,7 @@
 -module(inet_res_SUITE).
 
 -include_lib("common_test/include/ct.hrl").
+-include_lib("stdlib/include/assert.hrl").
 
 -include_lib("kernel/include/inet.hrl").
 -include_lib("kernel/src/inet_dns.hrl").
@@ -38,7 +39,7 @@
 	 nxdomain_reply/1, last_ms_answer/1, intermediate_error/1,
          servfail_retry_timeout_default/1, servfail_retry_timeout_1000/1,
          label_compression_limit/1, update/1, tsig_client/1, tsig_server/1,
-         mdns_encode_decode/1
+         mdns_encode_decode/1, dnssec_rrs/1
         ]).
 -export([
 	 gethostbyaddr/0, gethostbyaddr/1,
@@ -84,7 +85,7 @@ all() ->
      mdns_encode_decode,
      gethostbyaddr, gethostbyaddr_v6, gethostbyname,
      gethostbyname_v6, getaddr, getaddr_v6, ipv4_to_ipv6,
-     host_and_addr].
+     host_and_addr, dnssec_rrs].
 
 groups() -> 
     [].
@@ -139,6 +140,7 @@ zone_dir(TC) ->
 	last_ms_answer       -> otptest;
 	update               -> otptest;
 	tsig_client          -> otptest;
+    dnssec_rrs           -> otptest;
         intermediate_error   ->
             {internal,
              #{rcode => ?REFUSED}};
@@ -1813,6 +1815,51 @@ ipv4_to_ipv6(Config) -> inet_SUITE:ipv4_to_ipv6(Config).
 host_and_addr() -> inet_SUITE:host_and_addr().
 host_and_addr(Config) -> inet_SUITE:host_and_addr(Config).
 
+%% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Fetch various kinds of DNSSEC RRs and verify that we can parse them
+
+dnssec_rrs(Config) when is_list(Config) ->
+    ?P("begin"),
+    NS = ns(Config),
+    Options = [{edns,0}, dnssec_ok, nxdomain_reply, {nameservers, [NS]}],
+
+    {ok, DSMsg} = inet_res:resolve("t-ds.otptest.", in, ds, Options),
+    [DSRR] = inet_dns:msg(DSMsg, anlist),
+    ?assertMatch(#{keytag := 59407, algorithm := 8, digest_type := 2},
+                 inet_dns:rr(DSRR, data)),
+
+    {ok, DNSKEYMsg} = inet_res:resolve("t-dnskey.otptest.", in, dnskey, Options),
+    [DNSKEYRR] = inet_dns:msg(DNSKEYMsg, anlist),
+    ?assertMatch(#{zk := 1, sep := 1, protocol := 3, algorithm := 8,
+                   keytag := 54395}, inet_dns:rr(DNSKEYRR, data)),
+
+    {ok, RRSIGMsg} = inet_res:resolve("t-rrsig.otptest.", in, rrsig, Options),
+    [RRSIGRR] = inet_dns:msg(RRSIGMsg, anlist),
+    ?assertMatch(#{type_covered := ns, algorithm := 8, labels := 2,
+                    original_ttl := 172800, signature_inception := 1756296000,
+                    signature_expire := 1756382400, keytag := 59407,
+                    signers_name := "otptest"},
+                 inet_dns:rr(RRSIGRR, data)),
+
+    {ok, NSECMsg} = inet_res:resolve("t-nsec.otptest.", in, nsec, Options),
+    [NSECRR] = inet_dns:msg(NSECMsg, anlist),
+    ?assertMatch(#{next_name := "t-nsec3.otptest", types := [a, aaaa, rrsig]},
+                inet_dns:rr(NSECRR, data)),
+
+    {ok, NSEC3PARAMMsg} = inet_res:resolve("t-nsec3param.otptest", in, nsec3param, Options),
+    [NSEC3PARAMRR] = inet_dns:msg(NSEC3PARAMMsg, anlist),
+    ?assertMatch(#{hash_algorithm := 1, flags := 0, iterations := 0, salt_length := 4,
+                   salt := <<16#deadbeef:32/integer>>},
+                inet_dns:rr(NSEC3PARAMRR, data)),
+
+    {ok, NSEC3Msg} = inet_res:resolve("otptest.", in, nsec3, Options),
+    [NSEC3RR] = inet_dns:msg(NSEC3Msg, anlist),
+    ?assertMatch(#{hash_algorithm := 1, flags := 0, iterations := 0, salt_length := 8,
+                   salt := <<16#5A992F48CFB97692:64/integer>>, types := [a, aaaa, rrsig]},
+                 inet_dns:rr(NSEC3RR, data)),
+
+    ?P("end"),
+    ok.
 
 timestamp() ->
     erlang:monotonic_time(milli_seconds).

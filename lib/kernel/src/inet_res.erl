@@ -156,7 +156,8 @@ example_lookup(Name, Class, Type) ->
 
 -type dns_rr_type() :: a | aaaa | caa | cname | gid | hinfo | ns | mb | md | mg
                  | mf | minfo | mx | naptr | null | ptr | soa | spf | srv
-                 | txt | uid | uinfo | unspec | uri | wks.
+                 | txt | uid | uinfo | unspec | uri | wks | ds | rrsig | dnskey
+                 | nsec | nsec3 | nsec3param.
 
 -type dns_class() :: in | chaos | hs | any.
 
@@ -319,7 +320,8 @@ Option `nxdomain_reply` (or rather `{nxdomain_reply, true}`) causes NXDOMAIN
 errors from DNS servers to be returned as `{error, {nxdomain, dns_msg()}}`.
 `t:dns_msg/0` contains the additional sections that where included by the
 answering server. This is mainly useful to inspect the SOA record
-to get the TTL for negative caching.
+to get the TTL for negative caching, or to inspect NSEC and NSEC3 records
+returned if the query had DNSSEC enabled.
 
 If `Opt` is any atom, it is interpreted as `{Opt,true}` unless
 the atom string starts with `"no"`, making the interpretation `{Opt,false}`.

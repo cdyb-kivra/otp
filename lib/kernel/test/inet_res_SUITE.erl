@@ -1493,7 +1493,7 @@ tsig_client(Config) when is_list(Config) ->
     },
     Pkt = inet_dns:encode(Request),
 
-    Key = {"testkey","ded5ada3-07f2-42b9-84bf-82d30f6795ee"},
+    Key = {"testkey.otptest","ded5ada3-07f2-42b9-84bf-82d30f6795ee"},
     TS0 = inet_dns_tsig:init([{key,Key}]),
     {ok,PktS,TS1} = inet_dns_tsig:sign(Pkt, TS0),
 

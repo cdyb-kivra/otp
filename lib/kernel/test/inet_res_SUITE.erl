@@ -140,7 +140,7 @@ zone_dir(TC) ->
 	last_ms_answer       -> otptest;
 	update               -> otptest;
 	tsig_client          -> otptest;
-    dnssec_rrs           -> otptest;
+        dnssec_rrs           -> otptest;
         intermediate_error   ->
             {internal,
              #{rcode => ?REFUSED}};

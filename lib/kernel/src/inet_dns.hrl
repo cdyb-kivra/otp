@@ -80,11 +80,11 @@
 -define(T_NAPTR,        35).            %% naming authority pointer
 -define(T_OPT,          41).            %% EDNS pseudo-rr RFC6891(7)
 %% DNSSEC (RFC 4034 and RFC 5155)
--define(T_DS,			43).			%% Delegation Signer
--define(T_RRSIG,		46).			%% RRset signature
--define(T_NSEC,			47).			%% Next signed name
--define(T_DNSKEY,		48).			%% DNSSEC public key
--define(T_NSEC3, 		50).			%% Non-revealing denial
+-define(T_DS,           43).            %% Delegation Signer
+-define(T_RRSIG,        46).            %% RRset signature
+-define(T_NSEC,         47).            %% Next signed name
+-define(T_DNSKEY,       48).            %% DNSSEC public key
+-define(T_NSEC3,        50).            %% Non-revealing denial
 -define(T_NSEC3PARAM,	51).
 %% SPF (RFC 4408)
 -define(T_SPF,          99).            %% server policy framework
@@ -132,11 +132,11 @@
 -define(S_NAPTR,        naptr).         %% naming authority pointer
 -define(S_OPT,          opt).           %% EDNS pseudo-rr RFC6891(7)
 %% DNSSEC (RFC 4034 and RFC 5155)
--define(S_DS,			ds).
--define(S_RRSIG,		rrsig).
--define(S_NSEC,			nsec).
--define(S_DNSKEY,		dnskey).
--define(S_NSEC3, 		nsec3).
+-define(S_DS,           ds).
+-define(S_RRSIG,        rrsig).
+-define(S_NSEC,         nsec).
+-define(S_DNSKEY,       dnskey).
+-define(S_NSEC3,        nsec3).
 -define(S_NSEC3PARAM,	nsec3param).
 %% SPF (RFC 4408)
 -define(S_SPF,          spf).           %% server policy framework

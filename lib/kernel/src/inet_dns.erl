@@ -439,13 +439,13 @@ decode_type(Type) ->
 	?T_NAPTR -> ?S_NAPTR;
 	?T_OPT -> ?S_OPT;
 	?T_SPF -> ?S_SPF;
-    %% DNSSEC
-    ?T_DS -> ?S_DS;
-    ?T_DNSKEY -> ?S_DNSKEY;
-    ?T_RRSIG -> ?S_RRSIG;
-    ?T_NSEC -> ?S_NSEC;
-    ?T_NSEC3 -> ?S_NSEC3;
-    ?T_NSEC3PARAM -> ?S_NSEC3PARAM;
+        %% DNSSEC
+        ?T_DS -> ?S_DS;
+        ?T_DNSKEY -> ?S_DNSKEY;
+        ?T_RRSIG -> ?S_RRSIG;
+        ?T_NSEC -> ?S_NSEC;
+        ?T_NSEC3 -> ?S_NSEC3;
+        ?T_NSEC3PARAM -> ?S_NSEC3PARAM;
 	%% non standard
 	?T_UINFO -> ?S_UINFO;
 	?T_UID -> ?S_UID;
@@ -489,13 +489,13 @@ encode_type(Type) ->
 	?S_NAPTR -> ?T_NAPTR;
 	?S_OPT -> ?T_OPT;
 	?S_SPF -> ?T_SPF;
-    %% DNSSEC
-    ?S_DS -> ?T_DS;
-    ?S_DNSKEY -> ?T_DNSKEY;
-    ?S_RRSIG -> ?T_RRSIG;
-    ?S_NSEC -> ?T_NSEC;
-    ?S_NSEC3 -> ?T_NSEC3;
-    ?S_NSEC3PARAM -> ?T_NSEC3PARAM;
+        %% DNSSEC
+        ?S_DS -> ?T_DS;
+        ?S_DNSKEY -> ?T_DNSKEY;
+        ?S_RRSIG -> ?T_RRSIG;
+        ?S_NSEC -> ?T_NSEC;
+        ?S_NSEC3 -> ?T_NSEC3;
+        ?S_NSEC3PARAM -> ?T_NSEC3PARAM;
 	%% non standard
 	?S_UINFO -> ?T_UINFO;
 	?S_UID -> ?T_UID;
